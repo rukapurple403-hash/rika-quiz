@@ -1,144 +1,249 @@
-const DB = [
-  {
-    unit: "生物",
-    items: [
-      {
-        id: "bio-001",
-        q: "植物が光を受けてデンプンなどをつくるはたらきは？",
-        a: ["呼吸", "蒸散", "光合成", "受粉"],
-        correct: 2,
-        ex: "二酸化炭素と水から、光エネルギーを使って有機物（デンプンなど）をつくり、酸素を放出する。"
-      },
-      {
-        id: "bio-002",
-        q: "食物連鎖で、植物を食べる動物は何という？",
-        a: ["生産者", "一次消費者", "二次消費者", "分解者"],
-        correct: 1,
-        ex: "植物（生産者）を食べる動物は一次消費者。一次消費者を食べるのが二次消費者。"
-      },
-    ],
-  },
-  {
-    unit: "化学",
-    items: [
-      {
-        id: "chem-001",
-        q: "水にとけた物質をふくむ液体を何という？",
-        a: ["溶媒", "溶液", "飽和水溶液", "混合物"],
-        correct: 1,
-        ex: "溶質が溶媒に溶けたもの全体を溶液という。"
-      },
-    ],
-  },
-];
-
+// app.js
 const $ = (id) => document.getElementById(id);
-const unitSel = $("unit");
-const meta = $("meta");
+
+const gradeSel = $("grade");
+const fieldSel = $("field");
+const limitSel = $("limit");
+const btnNext = $("btnNext");
+const btnRestart = $("btnRestart");
+
+const poolInfo = $("poolInfo");
+const modePill = $("modePill");
+
 const qEl = $("q");
 const choicesEl = $("choices");
-const resultEl = $("result");
+const resultText = $("resultText");
 const exBox = $("exBox");
 const exEl = $("ex");
 
-const LS_WRONG = "rikaQuizWrongIds";
+const statCorrect = $("statCorrect");
+const statTotal = $("statTotal");
+const statAcc = $("statAcc");
+const statStreak = $("statStreak");
+const statBestStreak = $("statBestStreak");
 
-let mode = "all"; // all | wrong
-let current = null;
+const nicknameEl = $("nickname");
+const btnSaveScore = $("btnSaveScore");
+const boardEl = $("leaderboard");
+const btnClearBoard = $("btnClearBoard");
 
-function getWrongSet() {
-  try { return new Set(JSON.parse(localStorage.getItem(LS_WRONG) || "[]")); }
-  catch { return new Set(); }
-}
-function saveWrongSet(set) {
-  localStorage.setItem(LS_WRONG, JSON.stringify([...set]));
-}
+const LS_BOARD = "rikaQuizBoard_v1";
 
-function units() {
-  return DB.map(x => x.unit);
-}
+let currentQ = null;
+let locked = false;
 
-function itemsByUnit(unit) {
-  return DB.find(x => x.unit === unit)?.items || [];
-}
+let total = 0;
+let correct = 0;
+let streak = 0;
+let bestStreak = 0;
 
-function pickRandom(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-function pool(unit) {
-  const items = itemsByUnit(unit);
-  if (mode === "all") return items;
-  const wrong = getWrongSet();
-  return items.filter(x => wrong.has(x.id));
+function shuffle(arr){ return [...arr].sort(()=>Math.random()-0.5); }
+function pickN(arr, n){
+  const s = shuffle(arr);
+  return s.slice(0, Math.min(n, s.length));
 }
 
-function renderQuestion() {
-  const unit = unitSel.value;
-  const p = pool(unit);
-  if (p.length === 0) {
-    qEl.textContent = (mode === "wrong")
-      ? "間違いリストが空です。まずは通常モードで解いてね。"
-      : "問題がありません。";
-    choicesEl.innerHTML = "";
-    resultEl.textContent = "";
-    exBox.classList.add("hidden");
-    meta.textContent = `単元：${unit} / モード：${mode}`;
+function fieldName(f){
+  return ({life:"生命", chem:"物質", phys:"エネルギー", earth:"地球"})[f] || "全分野";
+}
+function themeByField(f){
+  if (f === "life") return "theme-life";
+  if (f === "chem") return "theme-chem";
+  if (f === "phys") return "theme-phys";
+  if (f === "earth") return "theme-earth";
+  return "theme-life";
+}
+
+function filteredTerms(){
+  const g = gradeSel.value;
+  const f = fieldSel.value;
+
+  return TERMS.filter(t => {
+    const okG = (g === "all") ? true : String(t.grade) === g;
+    const okF = (f === "all") ? true : t.field === f;
+    return okG && okF;
+  });
+}
+
+function buildQuestion(){
+  const pool = filteredTerms();
+  if (pool.length < 4) return null;
+
+  const item = pool[Math.floor(Math.random() * pool.length)];
+  const correctTerm = item.term;
+
+  const distractPool = pool
+    .map(x => x.term)
+    .filter(w => w !== correctTerm);
+
+  const choices = shuffle([correctTerm, ...pickN(distractPool, 3)]);
+
+  return {
+    key: `${item.grade}-${item.field}-${item.term}`,
+    prompt: `次の説明に当てはまる用語は？\n「${item.hint}」`,
+    choices,
+    correctIndex: choices.indexOf(correctTerm),
+    explain: `答え：${correctTerm}`
+  };
+}
+
+function updateStats(){
+  statCorrect.textContent = String(correct);
+  statTotal.textContent = String(total);
+  const acc = total === 0 ? 0 : Math.round((correct/total)*100);
+  statAcc.textContent = `${acc}%`;
+  statStreak.textContent = String(streak);
+  statBestStreak.textContent = String(bestStreak);
+
+  const pool = filteredTerms();
+  poolInfo.textContent = `対象：${gradeSel.value==="all"?"全学年":gradeSel.value+"年"} / ${fieldSel.value==="all"?"全分野":fieldName(fieldSel.value)} / 用語 ${pool.length}語`;
+}
+
+function setTheme(){
+  document.body.className = themeByField(fieldSel.value === "all" ? "life" : fieldSel.value);
+}
+
+function resetUI(){
+  choicesEl.innerHTML = "";
+  resultText.textContent = "";
+  exEl.textContent = "";
+  exBox.classList.add("hidden");
+}
+
+function renderQuestion(){
+  setTheme();
+  updateStats();
+  resetUI();
+
+  const q = buildQuestion();
+  if (!q){
+    qEl.textContent = "用語が少なすぎて4択が作れません。学年/分野を広げるか、TERMSを増やしてね。";
     return;
   }
 
-  current = pickRandom(p);
-  meta.textContent = `単元：${unit} / モード：${mode} / ID：${current.id}`;
-  qEl.textContent = current.q;
-  resultEl.textContent = "";
-  exBox.classList.add("hidden");
-  exEl.textContent = "";
+  currentQ = q;
+  locked = false;
 
-  choicesEl.innerHTML = "";
-  current.a.forEach((text, idx) => {
+  qEl.textContent = q.prompt;
+
+  q.choices.forEach((text, idx) => {
     const btn = document.createElement("button");
     btn.className = "choice";
-    btn.textContent = `${idx + 1}. ${text}`;
+    btn.textContent = `${idx+1}. ${text}`;
     btn.onclick = () => answer(idx, btn);
     choicesEl.appendChild(btn);
   });
+
+  const limit = Number(limitSel.value);
+  modePill.textContent = (limit === 0) ? "エンドレス" : `${limit}問チャレンジ`;
 }
 
-function answer(idx, btn) {
-  const wrong = getWrongSet();
+function answer(idx, btn){
+  if (!currentQ || locked) return;
+  locked = true;
 
-  // disable all
-  [...choicesEl.querySelectorAll("button")].forEach(b => b.disabled = true);
-
-  const correct = current.correct;
   const buttons = [...choicesEl.querySelectorAll("button")];
-  buttons[correct].classList.add("correct");
+  buttons.forEach(b => b.disabled = true);
 
-  if (idx === correct) {
-    resultEl.textContent = "⭕ 正解！";
-    wrong.delete(current.id);
+  total += 1;
+
+  const c = currentQ.correctIndex;
+  buttons[c].classList.add("correct");
+
+  if (idx === c){
+    correct += 1;
+    streak += 1;
+    bestStreak = Math.max(bestStreak, streak);
+    resultText.textContent = "⭕ 正解！";
   } else {
-    resultEl.textContent = "❌ 不正解…（復習リストに追加）";
+    streak = 0;
     btn.classList.add("wrong");
-    wrong.add(current.id);
+    resultText.textContent = "❌ 不正解…";
   }
-  saveWrongSet(wrong);
 
-  exEl.textContent = current.ex;
+  exEl.textContent = currentQ.explain;
   exBox.classList.remove("hidden");
+
+  updateStats();
+
+  const limit = Number(limitSel.value);
+  if (limit !== 0 && total >= limit){
+    resultText.textContent += `　（${limit}問終了！記録したいなら右の「記録」）`;
+  }
 }
 
-$("btnNext").onclick = renderQuestion;
-$("btnWrong").onclick = () => { mode = (mode === "wrong") ? "all" : "wrong"; renderQuestion(); };
-$("btnReset").onclick = () => { localStorage.removeItem(LS_WRONG); renderQuestion(); };
-
-function init() {
-  units().forEach(u => {
-    const opt = document.createElement("option");
-    opt.value = u; opt.textContent = u;
-    unitSel.appendChild(opt);
-  });
-  unitSel.onchange = renderQuestion;
+function restart(){
+  total = 0; correct = 0; streak = 0; bestStreak = 0;
   renderQuestion();
 }
-init();
+
+function loadBoard(){
+  try{
+    return JSON.parse(localStorage.getItem(LS_BOARD) || "[]");
+  }catch{
+    return [];
+  }
+}
+function saveBoard(board){
+  localStorage.setItem(LS_BOARD, JSON.stringify(board));
+}
+function renderBoard(){
+  const board = loadBoard();
+  boardEl.innerHTML = "";
+  board.forEach(row => {
+    const li = document.createElement("li");
+    li.textContent = `${row.name}：${row.score}点（正答率${row.acc}% / ${row.total}問）`;
+    boardEl.appendChild(li);
+  });
+}
+function calcScore(){
+  // スコア：正解×10 + 連続最高×2（おまけ）
+  const acc = total === 0 ? 0 : Math.round((correct/total)*100);
+  const score = correct*10 + bestStreak*2;
+  return { score, acc };
+}
+function saveScore(){
+  const name = (nicknameEl.value || "名無し").trim().slice(0,12) || "名無し";
+  const limit = Number(limitSel.value);
+  if (limit !== 0 && total < limit){
+    alert(`まだ${limit}問に達していません（いま${total}問）。全部解いてから記録がおすすめ。`);
+    return;
+  }
+  if (total === 0){
+    alert("まだ解いていません。まず1問解こう。");
+    return;
+  }
+
+  const {score, acc} = calcScore();
+  const board = loadBoard();
+  board.push({ name, score, acc, total, ts: Date.now() });
+
+  board.sort((a,b)=> b.score - a.score);
+  const top10 = board.slice(0,10);
+
+  saveBoard(top10);
+  renderBoard();
+}
+
+gradeSel.onchange = renderQuestion;
+fieldSel.onchange = renderQuestion;
+limitSel.onchange = restart;
+
+btnNext.onclick = () => {
+  const limit = Number(limitSel.value);
+  if (limit !== 0 && total >= limit){
+    alert("このチャレンジは終了！右の「記録」か「やり直し」をどうぞ。");
+    return;
+  }
+  renderQuestion();
+};
+btnRestart.onclick = restart;
+
+btnSaveScore.onclick = saveScore;
+btnClearBoard.onclick = () => {
+  localStorage.removeItem(LS_BOARD);
+  renderBoard();
+};
+
+renderBoard();
+renderQuestion();
