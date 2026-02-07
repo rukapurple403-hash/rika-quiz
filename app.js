@@ -42,7 +42,34 @@ function pickN(arr, n){
   const s = shuffle(arr);
   return s.slice(0, Math.min(n, s.length));
 }
-
+function bigrams(s){
+  const t = [...String(s)];
+  const out = [];
+  for(let i=0;i<t.length-1;i++) out.push(t[i]+t[i+1]);
+  return out;
+}
+function jaccard(a, b){
+  const A = new Set(a), B = new Set(b);
+  let inter = 0;
+  for(const x of A) if(B.has(x)) inter++;
+  const union = A.size + B.size - inter;
+  return union === 0 ? 0 : inter / union;
+}
+function similarityTerm(x, y){
+  x = String(x); y = String(y);
+  const bg = jaccard(bigrams(x), bigrams(y));
+  const head = (x[0] && y[0] && x[0]===y[0]) ? 0.25 : 0;
+  const tail = (x.at(-1) && y.at(-1) && x.at(-1)===y.at(-1)) ? 0.15 : 0;
+  const len  = (Math.abs(x.length - y.length) <= 1) ? 0.10 : 0;
+  return bg + head + tail + len;
+}
+function pickSimilarTerms(correct, candidates, n){
+  const scored = candidates
+    .filter(w => w !== correct)
+    .map(w => ({ w, s: similarityTerm(correct, w) }))
+    .sort((a,b)=> b.s - a.s);
+  return scored.slice(0, 30).sort(()=>Math.random()-0.5).slice(0, n).map(x=>x.w);
+}
 function fieldName(f){
   return ({life:"生命", chem:"物質", phys:"エネルギー", earth:"地球"})[f] || "全分野";
 }
