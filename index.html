@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>理科クイズ</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>理科クイズ</h1>
+    <div class="row">
+      <select id="unit"></select>
+      <button id="btnNext">次の問題</button>
+      <button id="btnWrong">間違いだけ</button>
+      <button id="btnReset">復習リスト消去</button>
+    </div>
+  </header>
+
+  <main id="card">
+    <div id="meta"></div>
+    <h2 id="q"></h2>
+    <div id="choices"></div>
+    <div id="result"></div>
+    <details id="exBox" class="hidden">
+      <summary>解説</summary>
+      <div id="ex"></div>
+    </details>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
