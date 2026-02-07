@@ -3,31 +3,99 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>理科クイズ</title>
+  <title>理科クイズ（用語）</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
-  <header>
-    <h1>理科クイズ</h1>
-    <div class="row">
-      <select id="unit"></select>
-      <button id="btnNext">次の問題</button>
-      <button id="btnWrong">間違いだけ</button>
-      <button id="btnReset">復習リスト消去</button>
+<body class="theme-life">
+  <header class="topbar">
+    <div class="title">
+      <div class="logo">理</div>
+      <div>
+        <h1>理科クイズ（用語）</h1>
+        <div class="sub" id="subtitle">学年×分野で選んで、テンポよく解く。</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <select id="grade">
+        <option value="all">全学年</option>
+        <option value="1">1年</option>
+        <option value="2">2年</option>
+        <option value="3">3年</option>
+      </select>
+
+      <select id="field">
+        <option value="all">全分野</option>
+        <option value="life">生命</option>
+        <option value="chem">物質</option>
+        <option value="phys">エネルギー</option>
+        <option value="earth">地球</option>
+      </select>
+
+      <select id="limit">
+        <option value="10">10問チャレンジ</option>
+        <option value="20">20問チャレンジ</option>
+        <option value="0">エンドレス</option>
+      </select>
+
+      <button id="btnNext">次へ</button>
+      <button id="btnRestart" class="ghost">やり直し</button>
     </div>
   </header>
 
-  <main id="card">
-    <div id="meta"></div>
-    <h2 id="q"></h2>
-    <div id="choices"></div>
-    <div id="result"></div>
-    <details id="exBox" class="hidden">
-      <summary>解説</summary>
-      <div id="ex"></div>
-    </details>
+  <main class="wrap">
+    <section class="card">
+      <div class="meta">
+        <span id="poolInfo"></span>
+        <span class="pill" id="modePill">通常</span>
+      </div>
+
+      <h2 id="q"></h2>
+
+      <div id="choices" class="choices"></div>
+
+      <div class="result">
+        <div id="resultText"></div>
+        <details id="exBox" class="hidden">
+          <summary>解説（短く）</summary>
+          <div id="ex"></div>
+        </details>
+      </div>
+    </section>
+
+    <section class="side">
+      <div class="panel">
+        <h3>スコア</h3>
+        <div class="stats">
+          <div><div class="k">正解</div><div class="v" id="statCorrect">0</div></div>
+          <div><div class="k">問題数</div><div class="v" id="statTotal">0</div></div>
+          <div><div class="k">正答率</div><div class="v" id="statAcc">0%</div></div>
+          <div><div class="k">連続</div><div class="v" id="statStreak">0</div></div>
+          <div><div class="k">最高連続</div><div class="v" id="statBestStreak">0</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>ランキング（この端末）</h3>
+        <div class="row">
+          <input id="nickname" placeholder="ニックネーム（任意）" maxlength="12" />
+          <button id="btnSaveScore">記録</button>
+        </div>
+        <ol id="leaderboard" class="board"></ol>
+        <button id="btnClearBoard" class="ghost small">ランキング消去</button>
+      </div>
+
+      <div class="panel tip">
+        <h3>コツ</h3>
+        <ul>
+          <li>まず「10問チャレンジ」→記録が伸びるとハマる。</li>
+          <li>分野を1つにしぼると、定着が速い。</li>
+        </ul>
+      </div>
+    </section>
   </main>
 
+  <script src="terms.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
