@@ -99,21 +99,29 @@ function buildQuestion(){
   const item = pool[Math.floor(Math.random() * pool.length)];
   const correctTerm = item.term;
 
-  const distractPool = pool
-    .map(x => x.term)
-    .filter(w => w !== correctTerm);
+  // ★ hintが空でも動くように保険
+  const hint = item.hint || `この用語の意味を説明できる？（用語：${item.term}）`;
 
-  const choices = shuffle([correctTerm, ...pickN(distractPool, 3)]);
+  // ★ 似た単語からダミーを選ぶ
+  const distractPool = pool.map(x => x.term);
+  let distractors = pickSimilarTerms(correctTerm, distractPool, 3);
+
+  // ★ 似た候補が足りない時の保険（必ず3つ埋める）
+  while(distractors.length < 3){
+    const r = distractPool[Math.floor(Math.random() * distractPool.length)];
+    if(r !== correctTerm && !distractors.includes(r)) distractors.push(r);
+  }
+
+  const choices = shuffle([correctTerm, ...distractors]);
 
   return {
     key: `${item.grade}-${item.field}-${item.term}`,
-    prompt: `次の説明に当てはまる用語は？\n「${item.hint}」`,
+    prompt: `次の説明に当てはまる用語は？\n「${hint}」`,
     choices,
     correctIndex: choices.indexOf(correctTerm),
     explain: `答え：${correctTerm}`
   };
 }
-
 function updateStats(){
   statCorrect.textContent = String(correct);
   statTotal.textContent = String(total);
