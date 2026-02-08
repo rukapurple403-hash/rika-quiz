@@ -3,21 +3,22 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>TERMS 生成ツール</title>
+  <title>TERMS 生成ツール（####抽出版）</title>
   <style>
     body{font-family:system-ui,-apple-system,"Noto Sans JP",sans-serif;margin:16px;line-height:1.5}
     textarea{width:100%;min-height:220px;border:1px solid #ccc;border-radius:12px;padding:12px;font-size:14px}
-    button{padding:10px 12px;border-radius:12px;border:1px solid #ccc;background:#fff;margin:6px 0}
+    button,select{padding:10px 12px;border-radius:12px;border:1px solid #ccc;background:#fff;margin:6px 0}
     .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     code{background:#f4f4f4;padding:2px 6px;border-radius:6px}
     .out{min-height:220px}
+    .note{color:#555;font-size:12px}
   </style>
 </head>
 <body>
-  <h1>TERMS生成ツール</h1>
-  <p>
-    下の欄に「用語」を1行1語で貼り付け → 学年/分野を選択 → 生成 を押す。<br>
-    出力を <code>terms.js</code> に貼り付ければ増やせる。
+  <h1>TERMS生成ツール（#### 抽出）</h1>
+  <p class="note">
+    入力に <code>#### 用語</code> と説明文が混ざっていてもOK。<br>
+    出力は「公開用（hint空）」と「メモ用（desc_raw付き）」の2種類。
   </p>
 
   <div class="row">
@@ -38,41 +39,98 @@
       </select>
     </label>
 
-    <button id="gen">生成</button>
+    <button id="gen">抽出して生成</button>
     <button id="copy">出力をコピー</button>
   </div>
 
-  <h2>入力（1行1語）</h2>
-  <textarea id="in" placeholder="例：
-細胞
-核
-葉緑体
-…"></textarea>
+  <h2>入力（#### 用語 + 説明 を貼ってOK）</h2>
+  <textarea id="in"></textarea>
 
-  <h2>出力（terms.jsに追記する用）</h2>
+  <h2>出力（公開用：terms.js に追記）</h2>
   <textarea id="out" class="out" readonly></textarea>
+
+  <h2>出力（メモ用：原文説明つき / 公開には使わない）</h2>
+  <textarea id="outMemo" class="out" readonly></textarea>
 
 <script>
 const $ = (id)=>document.getElementById(id);
-function escapeJS(s){ return s.replace(/\\/g,"\\\\").replace(/"/g,'\\"'); }
+function esc(s){
+  return String(s).replace(/\\/g,"\\\\").replace(/"/g,'\\"');
+}
+
+// #### 用語 の後ろの説明を次の #### まで集める
+function parseTerms(text){
+  const lines = text.split(/\r?\n/);
+
+  const items = [];
+  let current = null;
+
+  for (let raw of lines){
+    const line = raw.trim();
+
+    // 見出し語
+    if (line.startsWith("#### ")){
+      if (current){
+        current.desc = current.desc.join(" ").trim();
+        items.push(current);
+      }
+      const term = line.replace(/^####\s+/, "").trim();
+      current = { term, desc: [] };
+      continue;
+    }
+
+    // 次の章に入ったら終了（必要なら調整）
+    if (line.startsWith("## ") || line.startsWith("# ")){
+      // current を確定して以降は無視（ページ下部の説明などが混ざるのを防ぐ）
+      if (current){
+        current.desc = current.desc.join(" ").trim();
+        items.push(current);
+        current = null;
+      }
+      continue;
+    }
+
+    // 説明行
+    if (current && line !== ""){
+      current.desc.push(line);
+    }
+  }
+
+  if (current){
+    current.desc = current.desc.join(" ").trim();
+    items.push(current);
+  }
+
+  // 用語が空のもの排除
+  return items.filter(x => x.term);
+}
 
 $("gen").onclick = ()=>{
   const grade = Number($("grade").value);
   const field = $("field").value;
-  const lines = $("in").value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
 
-  const objs = lines.map(term=>{
-    // hintは空でOK（アプリ側で自動ヒントが入るようにする）
-    return `{ grade:${grade}, field:"${field}", term:"${escapeJS(term)}", hint:"" }`;
-  });
+  const parsed = parseTerms($("in").value);
 
-  $("out").value = objs.join(",\n") + (objs.length? ",\n":"");
+  // 公開用（hintは空にして、あとで自分の言葉で埋める）
+  const pub = parsed.map(x =>
+    `{ grade:${grade}, field:"${field}", term:"${esc(x.term)}", hint:"" }`
+  ).join(",\n") + (parsed.length ? ",\n" : "");
+
+  // メモ用（原文説明付き）※公開には使わない前提
+  const memo = parsed.map(x =>
+    `{ grade:${grade}, field:"${field}", term:"${esc(x.term)}", hint:"", desc_raw:"${esc(x.desc)}" }`
+  ).join(",\n") + (parsed.length ? ",\n" : "");
+
+  $("out").value = pub;
+  $("outMemo").value = memo;
+
+  alert(`抽出完了：${parsed.length}語`);
 };
 
 $("copy").onclick = async ()=>{
   try{
     await navigator.clipboard.writeText($("out").value);
-    alert("コピーしました。terms.js に貼り付けてOK！");
+    alert("公開用（out）をコピーしました。terms.js に貼り付けてOK！");
   }catch{
     alert("コピーできませんでした。出力欄を長押し→全選択→コピーでお願いします。");
   }
