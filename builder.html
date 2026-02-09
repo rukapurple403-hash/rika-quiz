@@ -198,7 +198,6 @@ const memo = parsed.map(x => {
   const hint = shortHintFromDesc(x.desc);
   return `{ grade:${grade}, field:"${field}", term:"${esc(x.term)}", hint:"${esc(hint)}", desc_raw:"${esc(x.desc)}" }`;
 }).join(",\n") + (parsed.length ? ",\n" : "");
-
   $("out").value = pub;
   $("outMemo").value = memo;
 
