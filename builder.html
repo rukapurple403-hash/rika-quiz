@@ -165,8 +165,7 @@ function parseTerms(text){
     .map(x => ({ term: x.term, desc: x.desc || "" }));
 }
 function shortHintFromDesc(desc){
-  return "TEST";
-}
+  let s = String(desc || "").replace(/\s+/g, " ").trim();
 
   // よくある前置き削除
   s = s.replace(/^.+?とは、?/, "");
