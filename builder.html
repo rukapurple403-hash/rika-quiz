@@ -60,49 +60,109 @@ function esc(s){
 
 // #### 用語 の後ろの説明を次の #### まで集める
 function parseTerms(text){
-  const lines = text.split(/\r?\n/);
+  const lines = text.split(/\r?\n/).map(s => s.replace(/\u00A0/g, " ")); // NBSP対策
+
+  // ① このへんの「見出しっぽい行」は無視したい
+  const isJunk = (line) => {
+    const t = line.trim();
+    if (!t) return true;
+    if (/^LastUpDate/i.test(t)) return true;
+    if (t === "中学理科の用語集") return true;
+    if (t === "用語検索") return true;
+    if (t.includes("全範囲") || t.includes("1年") || t.includes("2年") || t.includes("3年")) return true;
+    if (t === "理科の重要用語") return true;
+    if (t === "キーワード検索") return true;
+    if (t === "一覧から選択") return true;
+    if (t === "コンテンツ") return true;
+    if (t.startsWith("http") || t.startsWith("©")) return true;
+    if (t.includes("science.005net.com")) return true;
+    return false;
+  };
+
+  // ② 「これは用語っぽい」を判定（短め／句点なし／見出しや説明ではない）
+  const looksLikeTerm = (line) => {
+    const t = line.trim();
+    if (!t) return false;
+    if (isJunk(t)) return false;
+    if (t.length > 18) return false;              // 長すぎるのは説明っぽい
+    if (t.includes("。")) return false;            // 句点があるのは説明文っぽい
+    if (t.startsWith("基本的な使い方")) return false;
+    if (t.startsWith("例")) return false;
+    if (t.startsWith("被子植物") || t.startsWith("裸子植物")) return false; // 「花のつくり」直下の見出し対策
+    return true;
+  };
 
   const items = [];
   let current = null;
 
-  // #### の検出を「空白や見えない文字があっても拾う」ようにする
-  const isH4 = (s) => /^\s*####\s+/.test(s);
-
-  for (let raw of lines){
-    // 先頭の見えない文字も消す（NBSPなど対策）
-    const line = raw.replace(/\u00A0/g, " ").trim();
-
-    // 見出し語
-    if (isH4(line)){
-      // 前の語を確定
-      if (current){
-        current.desc = current.desc.join(" ").trim();
-        items.push(current);
+  // ③ まず `#### 用語` 形式を優先して抽出（あるなら確実）
+  const hasH4 = lines.some(l => /^\s*####\s+/.test(l.trim()));
+  if (hasH4){
+    for (const raw of lines){
+      const line = raw.trim();
+      if (/^\s*####\s+/.test(line)){
+        if (current){
+          current.desc = current.desc.join(" ").trim();
+          items.push(current);
+        }
+        const term = line.replace(/^\s*####\s+/, "").trim();
+        current = { term, desc: [] };
+        continue;
       }
-      const term = line.replace(/^\s*####\s+/, "").trim();
-      current = { term, desc: [] };
-      continue;
+      if (current){
+        const t = raw.trim();
+        if (!t) continue;
+        // 次の大見出し以降のゴミを避けたい
+        if (t.startsWith("## ") || t.startsWith("# ")) continue;
+        if (t.startsWith("http") || t.startsWith("©")) continue;
+        current.desc.push(t);
+      }
     }
+    if (current){
+      current.desc = current.desc.join(" ").trim();
+      items.push(current);
+    }
+  } else {
+    // ④ `####` が無いとき：用語(単独行) → 説明 → 空行、という形で抽出
+    for (let i=0; i<lines.length; i++){
+      const line = lines[i].trim();
 
-    // 説明行（次の####まで集める）
-    if (current && line !== ""){
-      // 余計なリンクやフッターっぽい行は軽く除外（必要なら追加）
-      if (line.startsWith("http")) continue;
-      if (line.startsWith("©")) continue;
-      current.desc.push(line);
+      if (isJunk(line)) continue;
+
+      if (looksLikeTerm(line)){
+        // 新しい用語開始
+        if (current){
+          current.desc = current.desc.join(" ").trim();
+          if (current.term) items.push(current);
+        }
+        current = { term: line, desc: [] };
+        continue;
+      }
+
+      // 説明の行
+      if (current){
+        const t = line;
+        if (!t){
+          // 空行で区切り
+          current.desc = current.desc.join(" ").trim();
+          items.push(current);
+          current = null;
+        } else if (!isJunk(t)) {
+          current.desc.push(t);
+        }
+      }
+    }
+    if (current){
+      current.desc = current.desc.join(" ").trim();
+      items.push(current);
     }
   }
 
-  if (current){
-    current.desc = current.desc.join(" ").trim();
-    items.push(current);
-  }
-
-  // termが空のもの排除 + 重複除去
+  // ⑤ 重複除去
   const seen = new Set();
   return items
-    .filter(x => x.term)
-    .filter(x => (seen.has(x.term) ? false : (seen.add(x.term), true)));
+    .filter(x => x.term && !seen.has(x.term) && (seen.add(x.term), true))
+    .map(x => ({ term: x.term, desc: x.desc || "" }));
 }
 $("gen").onclick = ()=>{
   const grade = Number($("grade").value);
