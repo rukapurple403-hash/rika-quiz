@@ -164,8 +164,9 @@ function parseTerms(text){
     .filter(x => x.term && !seen.has(x.term) && (seen.add(x.term), true))
     .map(x => ({ term: x.term, desc: x.desc || "" }));
 }
-  function shortHintFromDesc(desc){
-  let s = String(desc || "").replace(/\s+/g, " ").trim();
+function shortHintFromDesc(desc){
+  return "TEST";
+}
 
   // よくある前置き削除
   s = s.replace(/^.+?とは、?/, "");
