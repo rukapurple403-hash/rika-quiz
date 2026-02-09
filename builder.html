@@ -65,33 +65,30 @@ function parseTerms(text){
   const items = [];
   let current = null;
 
+  // #### の検出を「空白や見えない文字があっても拾う」ようにする
+  const isH4 = (s) => /^\s*####\s+/.test(s);
+
   for (let raw of lines){
-    const line = raw.trim();
+    // 先頭の見えない文字も消す（NBSPなど対策）
+    const line = raw.replace(/\u00A0/g, " ").trim();
 
     // 見出し語
-    if (line.startsWith("#### ")){
+    if (isH4(line)){
+      // 前の語を確定
       if (current){
         current.desc = current.desc.join(" ").trim();
         items.push(current);
       }
-      const term = line.replace(/^####\s+/, "").trim();
+      const term = line.replace(/^\s*####\s+/, "").trim();
       current = { term, desc: [] };
       continue;
     }
 
-    // 次の章に入ったら終了（必要なら調整）
-    if (line.startsWith("## ") || line.startsWith("# ")){
-      // current を確定して以降は無視（ページ下部の説明などが混ざるのを防ぐ）
-      if (current){
-        current.desc = current.desc.join(" ").trim();
-        items.push(current);
-        current = null;
-      }
-      continue;
-    }
-
-    // 説明行
+    // 説明行（次の####まで集める）
     if (current && line !== ""){
+      // 余計なリンクやフッターっぽい行は軽く除外（必要なら追加）
+      if (line.startsWith("http")) continue;
+      if (line.startsWith("©")) continue;
       current.desc.push(line);
     }
   }
@@ -101,10 +98,12 @@ function parseTerms(text){
     items.push(current);
   }
 
-  // 用語が空のもの排除
-  return items.filter(x => x.term);
+  // termが空のもの排除 + 重複除去
+  const seen = new Set();
+  return items
+    .filter(x => x.term)
+    .filter(x => (seen.has(x.term) ? false : (seen.add(x.term), true)));
 }
-
 $("gen").onclick = ()=>{
   const grade = Number($("grade").value);
   const field = $("field").value;
