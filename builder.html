@@ -164,6 +164,25 @@ function parseTerms(text){
     .filter(x => x.term && !seen.has(x.term) && (seen.add(x.term), true))
     .map(x => ({ term: x.term, desc: x.desc || "" }));
 }
+  function shortHintFromDesc(desc){
+  let s = String(desc || "").replace(/\s+/g, " ").trim();
+
+  // よくある前置き削除
+  s = s.replace(/^.+?とは、?/, "");
+  s = s.replace(/^.+?は、?/, "");
+  s = s.replace(/例・・・.*$/, "");
+  s = s.replace(/基本的な使い方.*$/, "");
+
+  // 句点で切って先頭文だけ
+  if (s.includes("。")) s = s.split("。")[0] + "。";
+
+  // それでも長ければカット（最後に…）
+  const max = 26;
+  if (s.length > max) s = s.slice(0, max-1) + "…";
+
+  if (s.length < 4) return "";
+  return s;
+  }
 $("gen").onclick = ()=>{
   const grade = Number($("grade").value);
   const field = $("field").value;
